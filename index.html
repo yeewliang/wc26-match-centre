@@ -40,6 +40,22 @@
   .day{margin:22px 0 8px;display:flex;align-items:center;gap:12px}
   .day h2{font-size:.85rem;letter-spacing:.2em;text-transform:uppercase;color:var(--chalk-dim);white-space:nowrap}
   .day::after{content:"";flex:1;height:2px;background:var(--line)}
+  details.dayblock{border:none;background:none;margin:0;overflow:visible}
+  details.dayblock>summary{cursor:pointer;list-style:none;margin:22px 0 8px;padding:0;
+    display:flex;align-items:center;gap:12px}
+  details.dayblock>summary::-webkit-details-marker{display:none}
+  details.dayblock>summary h2{font-size:.85rem;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--chalk-dim);white-space:nowrap}
+  details.dayblock>summary .daycount{font-size:.7rem;color:var(--chalk-dim);border:1px solid var(--line);
+    border-radius:999px;padding:1px 8px;letter-spacing:.05em}
+  details.dayblock>summary .ln{flex:1;height:2px;background:var(--line)}
+  details.dayblock>summary .chev{color:var(--chalk-dim);font-size:1.05rem;line-height:1;transition:transform .15s}
+  details.dayblock[open]>summary .chev{transform:rotate(90deg)}
+  details.dayblock.today>summary h2{color:var(--chalk);font-weight:700}
+  details.dayblock.today>summary .todaytag{margin-left:8px;font-size:.62rem;font-weight:700;
+    letter-spacing:.16em;color:#1c1606;background:var(--amber);border-radius:999px;padding:2px 8px}
+  .schedctl{display:flex;gap:8px;margin-top:6px}
+  .schedctl .more{margin-top:0}
   .sec{margin:30px 0 4px;font-size:1rem;letter-spacing:.2em;text-transform:uppercase;color:var(--amber);
     display:flex;align-items:center;gap:12px}
   .sec::after{content:"";flex:1;height:1px;background:var(--line)}
@@ -128,6 +144,10 @@
 
   <details class="brk" open>
     <summary>Fixtures &amp; results<span class="ln"></span><span class="chev">›</span></summary>
+    <div class="schedctl">
+      <button class="more" id="btnExpand">Expand all days</button>
+      <button class="more" id="btnCollapse">Collapse all days</button>
+    </div>
     <div id="sched"></div>
     <button class="more" id="btnMore">Show all remaining fixtures</button>
   </details>
@@ -358,17 +378,33 @@ function card(m){
     <div class="meta"><span class="grp-pill">Group ${m.g} · MD${m.md}</span>
     <span>${m.v||""}</span><span class="tag ${cls}">${lab}</span></div></div>`;
 }
+function dayBlock(label,inner,open,count,today){
+  return `<details class="dayblock${today?" today":""}"${open?" open":""}><summary>`+
+    `<h2>${label}${today?' <span class="todaytag">Today</span>':""}</h2>`+
+    `<span class="daycount">${count}</span><span class="ln"></span><span class="chev">›</span></summary>`+
+    `${inner}</details>`;
+}
 function renderSched(all){
   const el=document.getElementById("sched"),cut=Date.now()+5*864e5;
   const dated=matches.filter(m=>m.k).sort((a,b)=>Date.parse(a.k)-Date.parse(b.k));
   const show=all?dated:dated.filter(m=>m.hs!=null||Date.parse(m.k)<cut);
-  let h="",d="";
+  const days=[];let cur=null;
   for(const m of show){const dd=fd(m.k);
-    if(dd!==d){d=dd;h+=`<div class="day"><h2>${dd}</h2></div>`}h+=card(m)}
+    if(!cur||cur.label!==dd){cur={label:dd,ts:Date.parse(m.k),matches:[]};days.push(cur)}
+    cur.matches.push(m)}
+  const today=new Date();today.setHours(0,0,0,0);const todayMs=today.getTime();
+  // a day stays open if it's today or upcoming; previous days collapse
+  const dayMs=d=>{const dt=new Date(d.ts);dt.setHours(0,0,0,0);return dt.getTime()};
+  const isCurrent=d=>dayMs(d)>=todayMs;
+  const anyCurrent=days.some(isCurrent);
+  let h="";
+  days.forEach((d,i)=>{
+    const open=anyCurrent?isCurrent(d):i===days.length-1;  // fallback: open most recent day
+    h+=dayBlock(d.label,d.matches.map(card).join(""),open,d.matches.length,dayMs(d)===todayMs);
+  });
   if(all){
     const und=matches.filter(m=>!m.k).sort((a,b)=>a.md-b.md||a.g.localeCompare(b.g));
-    if(und.length){h+=`<div class="day"><h2>Awaiting confirmed kickoff times</h2></div>`;
-      for(const m of und)h+=card(m)}
+    if(und.length)h+=dayBlock("Awaiting confirmed kickoff times",und.map(card).join(""),false,und.length);
   }
   el.innerHTML=h;
   document.getElementById("btnMore").textContent=all?"Show fewer fixtures":"Show all remaining fixtures";
@@ -429,6 +465,9 @@ function renderStand(){
 function renderAll(){renderTree();renderSched(showAll);renderKo();renderStand()}
 let showAll=false;
 document.getElementById("btnMore").addEventListener("click",()=>{showAll=!showAll;renderSched(showAll)});
+const setAllDays=open=>document.querySelectorAll("#sched details.dayblock").forEach(d=>d.open=open);
+document.getElementById("btnExpand").addEventListener("click",()=>setAllDays(true));
+document.getElementById("btnCollapse").addEventListener("click",()=>setAllDays(false));
 document.getElementById("btnRefresh").addEventListener("click",refresh);
 renderAll();
 refresh();   /* auto-update on page load */
