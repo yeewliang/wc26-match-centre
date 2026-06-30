@@ -480,7 +480,12 @@ function renderKo(){
   for(const[name,dates,n,from,to]of ROUNDS){
     const inRound=koExtra.filter(m=>m.kickoff&&m.kickoff>=from&&m.kickoff<to);
     const done=inRound.filter(m=>m.st==="FT"),liveNow=inRound.filter(m=>m.st!=="FT");
-    h+=`<div class="day"><h2>${name} · ${dates}</h2></div><div class="kgrid">`;
+    h+=`<div class="day"><h2>${name} · ${dates}</h2></div>`;
+    if(done.length)   // completed ties fold into a collapsed block at the top (default collapsed)
+      h+=`<details class="donewrap"><summary><span class="chev">›</span>`+
+         `${done.length} completed ${done.length===1?"match":"matches"}<span class="ln"></span></summary>`+
+         `<div class="kgrid">${done.map(koCard).join("")}</div></details>`;
+    h+=`<div class="kgrid">`;
     h+=liveNow.map(koCard).join("");   // ties in progress stay visible
     if(n===16){
       const covered=new Set(inRound.map(m=>pairKey(m.home,m.away)));
@@ -493,10 +498,6 @@ function renderKo(){
         h+=`<div class="ko"><div class="row"><span class="slot">To be decided</span></div></div>`;
     }
     h+="</div>";
-    if(done.length)   // completed ties fold into a collapsed block (default collapsed)
-      h+=`<details class="donewrap"><summary><span class="chev">›</span>`+
-         `${done.length} completed ${done.length===1?"match":"matches"}<span class="ln"></span></summary>`+
-         `<div class="kgrid">${done.map(koCard).join("")}</div></details>`;
   }
   document.getElementById("ko").innerHTML=h;
 }
