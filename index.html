@@ -101,6 +101,7 @@
   .ko .slot{color:var(--chalk-dim);font-style:italic;font-size:.88rem}
   .ko .row.w{font-weight:700}
   .ko .sc{color:var(--amber);font-weight:700;font-variant-numeric:tabular-nums}
+  .ko .sc .pen{color:var(--chalk-dim);font-weight:600;font-size:.82em;margin-left:4px}
   details{border:1px solid var(--line);border-radius:var(--radius);background:var(--turf);margin:8px 0;overflow:hidden}
   summary{cursor:pointer;list-style:none;padding:12px 14px;display:flex;align-items:center;gap:10px;
     font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:.88rem}
@@ -143,6 +144,11 @@
   </details>
 
   <details class="brk" open>
+    <summary>Knockout rounds<span class="ln"></span><span class="chev">›</span></summary>
+    <div id="ko"></div>
+  </details>
+
+  <details class="brk">
     <summary>Fixtures &amp; results<span class="ln"></span><span class="chev">›</span></summary>
     <div class="schedctl">
       <button class="more" id="btnExpand">Expand all days</button>
@@ -152,12 +158,7 @@
     <button class="more" id="btnMore">Show all remaining fixtures</button>
   </details>
 
-  <details class="brk" open>
-    <summary>Knockout rounds<span class="ln"></span><span class="chev">›</span></summary>
-    <div id="ko"></div>
-  </details>
-
-  <details class="brk" open>
+  <details class="brk">
     <summary>Group standings<span class="ln"></span><span class="chev">›</span></summary>
     <div id="standings"></div>
   </details>
@@ -276,6 +277,7 @@ function normalizeEspn(data){
     const st={pre:"SCHED","in":"LIVE",post:"FT"}[state]||"SCHED";
     const num=v=>{const n=parseInt(v,10);return Number.isFinite(n)?n:null};
     out.push({home:h,away:a,hs:st!=="SCHED"?num(H.score):null,as:st!=="SCHED"?num(A.score):null,
+      hp:num(H.shootoutScore),ap:num(A.shootoutScore),
       st,kickoff:ev.date||null,venue:((comp.venue||{}).fullName)||null});
   }
   return{matches:out,updated:new Date().toISOString()};
@@ -286,6 +288,7 @@ function applyUpdate(u){
   if(m){
     const flip=m.home!==u.home;
     if(u.hs!=null){m.hs=flip?u.as:u.hs;m.as=flip?u.hs:u.as}
+    if(u.hp!=null||u.ap!=null){m.hp=flip?u.ap:u.hp;m.ap=flip?u.hp:u.ap}
     if(u.st)m.st=u.st;
     if(u.kickoff)m.k=u.kickoff;
     if(u.venue)m.v=u.venue;
@@ -340,7 +343,7 @@ function renderTree(){
   let hd=heads.map(h=>`<text x="${h[1]}" y="20" text-anchor="middle" font-size="11" letter-spacing="2" fill="#9db8a7">${h[0]}</text>`).join("");
   for(const[side,defs,cols]of[["L",R32L,colsL],["R",R32R,colsR]]){
     defs.forEach((pr,m)=>pr.forEach((s,k)=>{
-      const t=resolve(s);pill(cols[0],c0[2*m+k],t||shortLab(s),t?"team":"lab");
+      const t=resolve(s);pill(cols[0],c0[2*m+k],t?`${TEAMS[t][1]} ${t}`:shortLab(s),t?"team":"lab");
     }));
     for(let j=0;j<8;j++)pill(cols[1],c1[j],"","lab");
     for(let q=0;q<4;q++)pill(cols[2],c2[q],"","lab");
@@ -417,10 +420,13 @@ function slotHtml(s){
 }
 function koCard(m){
   const t=c=>`${TEAMS[c][1]} ${TEAMS[c][0]}`;
-  const wT=m.hs!=null&&m.hs>m.as,wB=m.hs!=null&&m.as>m.hs;
+  const pen=m.hp!=null&&m.ap!=null;
+  const wT=m.hs!=null&&(m.hs>m.as||(pen&&m.hs===m.as&&m.hp>m.ap));
+  const wB=m.hs!=null&&(m.as>m.hs||(pen&&m.hs===m.as&&m.ap>m.hp));
+  const sc=(s,p)=>`${s??""}${pen?`<span class="pen">(${p})</span>`:""}`;
   return `<div class="ko">
-    <div class="row ${wT?'w':''}"><span>${t(m.home)}</span><span class="sc">${m.hs??""}</span></div>
-    <div class="row ${wB?'w':''}"><span>${t(m.away)}</span><span class="sc">${m.as??""}</span></div>
+    <div class="row ${wT?'w':''}"><span>${t(m.home)}</span><span class="sc">${sc(m.hs,m.hp)}</span></div>
+    <div class="row ${wB?'w':''}"><span>${t(m.away)}</span><span class="sc">${sc(m.as,m.ap)}</span></div>
     ${m.kickoff?`<div class="meta" style="margin-top:6px">${fd(m.kickoff)} · ${ftm(m.kickoff)}</div>`:""}</div>`;
 }
 function renderKo(){
