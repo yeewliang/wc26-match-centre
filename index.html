@@ -59,7 +59,7 @@
     display:flex;align-items:center;gap:8px;font-size:.74rem;font-weight:600;
     letter-spacing:.1em;text-transform:uppercase;color:var(--chalk-dim)}
   details.donewrap>summary::-webkit-details-marker{display:none}
-  details.donewrap>summary .chev{color:var(--chalk-dim);font-size:1rem;line-height:1;transition:transform .15s}
+  details.donewrap>summary .chev{color:var(--amber);font-size:1rem;line-height:1;transition:transform .15s}
   details.donewrap[open]>summary .chev{transform:rotate(90deg)}
   details.donewrap>summary .ln{flex:1;height:1px;background:var(--line)}
   .schedctl{display:flex;gap:8px;margin-top:6px}
@@ -116,7 +116,7 @@
   summary::-webkit-details-marker{display:none}
   summary .lead{color:var(--chalk-dim);font-weight:400;font-size:.78rem;letter-spacing:.04em;text-transform:none}
   summary .chev{margin-left:auto;color:var(--amber);transition:transform .15s}
-  details[open] .chev{transform:rotate(90deg)}
+  details[open]>summary .chev{transform:rotate(90deg)}
   .pad{padding:0 14px 12px}
   table{width:100%;border-collapse:collapse;font-size:.9rem}
   th,td{padding:7px 8px;text-align:center;border-top:1px dashed var(--line);font-variant-numeric:tabular-nums}
