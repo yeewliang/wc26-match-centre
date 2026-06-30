@@ -318,6 +318,15 @@ const done=g=>matches.filter(m=>m.g===g&&m.st==="FT").length===6;
 function resolve(s){const m=/^([12])([A-L])$/.exec(s);
   if(m&&done(m[2]))return tableOf(m[2])[+m[1]-1].c;return null}
 const shortLab=s=>s.startsWith("3:")?"3 "+s.slice(2):s;
+/* winner of a finished knockout match between two team codes (penalties break ties) */
+function koWinner(a,b){
+  if(!a||!b)return null;
+  const m=koExtra.find(x=>pairKey(x.home,x.away)===pairKey(a,b));
+  if(!m||m.st!=="FT"||m.hs==null||m.as==null)return null;
+  if(m.hs!==m.as)return m.hs>m.as?m.home:m.away;
+  if(m.hp!=null&&m.ap!=null&&m.hp!==m.ap)return m.hp>m.ap?m.home:m.away;
+  return null;
+}
 
 /* ── renders ── */
 function renderTree(){
@@ -330,33 +339,53 @@ function renderTree(){
   const fin=(c3[0]+c3[1])/2;
   let p="",l="";
   const pill=(x,cy,txt,kind)=>{
-    const w=(kind==="champ"||kind==="fin")?76:pw,y=cy-ph/2;
+    const w=(kind==="champ"||kind==="fin"||kind==="finteam")?76:pw,y=cy-ph/2;
     const fill=kind==="champ"?"rgba(255,194,71,.18)":"#16311f";
     const stroke=kind==="champ"?"#ffc247":"rgba(242,247,240,.18)";
-    const tcol=kind==="champ"?"#ffc247":(kind==="team"?"#f2f7f0":"#9db8a7");
+    const bold=kind==="team"||kind==="champ"||kind==="finteam";
+    const tcol=kind==="champ"?"#ffc247":(kind==="team"||kind==="finteam")?"#f2f7f0":"#9db8a7";
     p+=`<rect x="${x}" y="${y}" width="${w}" height="${ph}" rx="6" fill="${fill}" stroke="${stroke}" stroke-width="0.8"/>`;
-    if(txt)p+=`<text x="${x+w/2}" y="${cy+3.5}" text-anchor="middle" font-size="11" font-weight="${kind==="team"||kind==="champ"?700:400}" fill="${tcol}">${txt}</text>`;
+    if(txt)p+=`<text x="${x+w/2}" y="${cy+3.5}" text-anchor="middle" font-size="11" font-weight="${bold?700:400}" fill="${tcol}">${txt}</text>`;
   };
+  const tlab=t=>`${TEAMS[t][1]} ${t}`;
   const link=(x1,y1,x2,y2)=>{const mx=(x1+x2)/2;
     l+=`<path d="M${x1},${y1} H${mx} V${y2} H${x2}" fill="none" stroke="rgba(242,247,240,.18)" stroke-width="0.8"/>`};
   const heads=[["R32",35],["R16",109],["QF",183],["SF",257],["FINAL",340],["SF",423],["QF",497],["R16",571],["R32",645]];
   let hd=heads.map(h=>`<text x="${h[1]}" y="20" text-anchor="middle" font-size="11" letter-spacing="2" fill="#9db8a7">${h[0]}</text>`).join("");
+  const [,,,R32F,R32T]=ROUNDS[0];                                    // round-of-32 date window
+  const fins={};
   for(const[side,defs,cols]of[["L",R32L,colsL],["R",R32R,colsR]]){
+    const r0=defs.map(([s0,s1])=>{                                   // R32 participants
+      let a=resolve(s0),b=resolve(s1);
+      const known=a||b;   // third-place opponents resolve once the match is actually played
+      if(known&&(!a||!b)){
+        const m=koExtra.find(x=>x.kickoff&&x.kickoff>=R32F&&x.kickoff<R32T&&(x.home===known||x.away===known));
+        if(m){const opp=m.home===known?m.away:m.home;if(!a)a=opp;else b=opp;}
+      }
+      return [a,b];
+    });
     defs.forEach((pr,m)=>pr.forEach((s,k)=>{
-      const t=resolve(s);pill(cols[0],c0[2*m+k],t?`${TEAMS[t][1]} ${t}`:shortLab(s),t?"team":"lab");
+      const t=r0[m][k];pill(cols[0],c0[2*m+k],t?tlab(t):shortLab(s),t?"team":"lab");
     }));
-    for(let j=0;j<8;j++)pill(cols[1],c1[j],"","lab");
-    for(let q=0;q<4;q++)pill(cols[2],c2[q],"","lab");
-    for(let s=0;s<2;s++)pill(cols[3],c3[s],"","lab");
+    const r1=r0.map(([a,b])=>koWinner(a,b));                          // R16 (R32 winners)
+    r1.forEach((t,j)=>pill(cols[1],c1[j],t?tlab(t):"",t?"team":"lab"));
+    const r2=[];for(let q=0;q<4;q++)r2.push(koWinner(r1[2*q],r1[2*q+1]));  // QF
+    r2.forEach((t,q)=>pill(cols[2],c2[q],t?tlab(t):"",t?"team":"lab"));
+    const r3=[];for(let s=0;s<2;s++)r3.push(koWinner(r2[2*s],r2[2*s+1]));  // SF
+    r3.forEach((t,s)=>pill(cols[3],c3[s],t?tlab(t):"",t?"team":"lab"));
+    fins[side]=koWinner(r3[0],r3[1]);                                 // finalist
     const e=side==="L"?pw:0;
     for(let m=0;m<8;m++)link(cols[0]+e,(c0[2*m]+c0[2*m+1])/2,cols[1]+(side==="L"?0:pw),c1[m]);
     for(let j=0;j<4;j++)link(cols[1]+e,(c1[2*j]+c1[2*j+1])/2,cols[2]+(side==="L"?0:pw),c2[j]);
     for(let q=0;q<2;q++)link(cols[2]+e,(c2[2*q]+c2[2*q+1])/2,cols[3]+(side==="L"?0:pw),c3[q]);
     link(cols[3]+e,fin,302+(side==="L"?0:76),fin-16);
   }
-  pill(302,fin-16,"","fin");pill(302,fin+10,"","fin");
-  pill(302,fin+52,"CHAMPIONS","champ");
-  pill(302,fin+80,"Runner-up","lab");
+  const champ=koWinner(fins.L,fins.R);
+  const runner=champ?(champ===fins.L?fins.R:fins.L):null;
+  pill(302,fin-16,fins.L?tlab(fins.L):"",fins.L?"finteam":"fin");
+  pill(302,fin+10,fins.R?tlab(fins.R):"",fins.R?"finteam":"fin");
+  pill(302,fin+52,champ?tlab(champ):"CHAMPIONS","champ");
+  pill(302,fin+80,runner?tlab(runner):"Runner-up","lab");
   pill(302,fin+106,"Third place","lab");
   document.getElementById("tree").innerHTML=
    `<svg viewBox="0 0 ${W} ${top+8*gapM+6}" role="img" aria-label="Knockout bracket from round of 32 to the final">${hd}${l}${p}</svg>`;
