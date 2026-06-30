@@ -54,6 +54,14 @@
   details.dayblock.today>summary h2{color:var(--chalk);font-weight:700}
   details.dayblock.today>summary .todaytag{margin-left:8px;font-size:.62rem;font-weight:700;
     letter-spacing:.16em;color:#1c1606;background:var(--amber);border-radius:999px;padding:2px 8px}
+  details.donewrap{border:none;background:none;margin:0;overflow:visible}
+  details.donewrap>summary{cursor:pointer;list-style:none;padding:7px 0;margin:0;
+    display:flex;align-items:center;gap:8px;font-size:.74rem;font-weight:600;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--chalk-dim)}
+  details.donewrap>summary::-webkit-details-marker{display:none}
+  details.donewrap>summary .chev{color:var(--chalk-dim);font-size:1rem;line-height:1;transition:transform .15s}
+  details.donewrap[open]>summary .chev{transform:rotate(90deg)}
+  details.donewrap>summary .ln{flex:1;height:1px;background:var(--line)}
   .schedctl{display:flex;gap:8px;margin-top:6px}
   .schedctl .more{margin-top:0}
   .sec{margin:30px 0 4px;font-size:1rem;letter-spacing:.2em;text-transform:uppercase;color:var(--amber);
@@ -429,10 +437,19 @@ function renderSched(all){
   const dayMs=d=>{const dt=new Date(d.ts);dt.setHours(0,0,0,0);return dt.getTime()};
   const isCurrent=d=>dayMs(d)>=todayMs;
   const anyCurrent=days.some(isCurrent);
+  // completed matches collapse into a nested block (default collapsed); live/upcoming stay visible
+  const doneBlock=ms=>`<details class="donewrap"><summary><span class="chev">›</span>`+
+    `${ms.length} completed ${ms.length===1?"match":"matches"}<span class="ln"></span></summary>`+
+    `${ms.map(card).join("")}</details>`;
   let h="";
   days.forEach((d,i)=>{
     const open=anyCurrent?isCurrent(d):i===days.length-1;  // fallback: open most recent day
-    h+=dayBlock(d.label,d.matches.map(card).join(""),open,d.matches.length,dayMs(d)===todayMs);
+    const done=d.matches.filter(m=>m.st==="FT"),rest=d.matches.filter(m=>m.st!=="FT");
+    // only fold completed matches away when the day also has live/upcoming ones to show
+    const inner=(done.length&&rest.length)
+      ? doneBlock(done)+rest.map(card).join("")
+      : d.matches.map(card).join("");
+    h+=dayBlock(d.label,inner,open,d.matches.length,dayMs(d)===todayMs);
   });
   if(all){
     const und=matches.filter(m=>!m.k).sort((a,b)=>a.md-b.md||a.g.localeCompare(b.g));
